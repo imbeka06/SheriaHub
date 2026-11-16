@@ -12,3 +12,14 @@ Thumbs.db
 .env.local
 .env.*
 !.env.example
+
+# AI Agent & IDE specific folders
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+
+# Local environment variables (ensure these are never tracked)
+.env
+.env.local
+*.env
