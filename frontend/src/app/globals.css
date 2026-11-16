@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* PASTE YOUR ENTIRE <style> BLOCK FROM THE PREVIOUS HTML HERE */
+:root{
+  --graphite:#3d4248;--graphite-2:#59616a;--ink:#25292e;--slate:#66717c;
+  --silver:#d9dde1;--paper:#f2f3f4;--white:#ffffff;--accent:#59636e;
+  --accent-soft:#e8ebee;--shadow:0 12px 35px rgba(35,42,49,.07);
+  --kuse-purple:#5e5ce6;--kuse-pink:#f06292;--kuse-blue:#26c6da;--kuse-green:#2ecc71;--kuse-yellow:#f4b400;
+}
+/* ... (rest of your CSS) ... */
