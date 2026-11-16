@@ -14,3 +14,5 @@ npm-debug.log*
 
 # testing
 coverage/
+
+/src/generated/prisma
