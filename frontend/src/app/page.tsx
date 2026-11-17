@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import AuthScreen from "../components/AuthScreen";
 
+// --- MOCK DATA ---
 const roleData = {
   student: { name: "Sebastian Juma", init: "SJ", roleLabel: "Student", context: "Student Portal", greeting: "Good afternoon, Sebastian.", sub: "A little progress today is a stronger argument tomorrow." },
   lecturer: { name: "Dr. Ochieng", init: "DO", roleLabel: "Lecturer", context: "Lecturer Portal", greeting: "Good afternoon, Dr. Ochieng.", sub: "Manage your marking queue, delegate tasks, and monitor cohort progress." },
@@ -10,15 +13,26 @@ const roleData = {
 };
 
 export default function Home() {
+  // 1. ALL HOOKS MUST GO AT THE TOP
+  const { user, loading } = useAuth();
+  
   const [activeRole, setActiveRole] = useState<"student" | "lecturer" | "researcher" | "admin">("student");
   const [activePage, setActivePage] = useState("overview");
   const [activeTab, setActiveTab] = useState("tab-planner");
-  
+
   // Pomodoro State
   const [timer, setTimer] = useState(1500);
   const [isRunning, setIsRunning] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
 
+  // Sync logged-in user's role with the dashboard view
+  useEffect(() => {
+    if (user) {
+      setActiveRole(user.role.toLowerCase() as "student" | "lecturer" | "researcher" | "admin");
+    }
+  }, [user]);
+
+  // Pomodoro Timer Effect
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isRunning && timer > 0) {
@@ -30,6 +44,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isRunning, timer]);
 
+  // 2. HELPER FUNCTIONS
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 2600);
@@ -41,13 +56,27 @@ export default function Home() {
     return `${m}:${s}`;
   };
 
-  const currentRole = roleData[activeRole];
-
   const switchRole = (role: "student" | "lecturer" | "researcher" | "admin") => {
     setActiveRole(role);
     setActivePage("overview");
   };
 
+  const currentRole = roleData[activeRole];
+
+  // 3. EARLY RETURNS (MUST BE BELOW ALL HOOKS)
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--paper)", color: "var(--slate)" }}>
+        Loading SheriaHub...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  // 4. MAIN DASHBOARD RENDER
   return (
     <div className="app">
       {/* SIDEBAR */}
