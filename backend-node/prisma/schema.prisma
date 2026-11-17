@@ -1,27 +1,13 @@
-generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
-}
+// ... existing User model ...
 
-datasource db {
-  provider = "postgresql"
-}
-
-// Ensure this ENUM is here
-enum Role {
-  STUDENT
-  LECTURER
-  RESEARCHER
-  ADMIN
-}
-
-// Ensure this MODEL is here
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      Role     @default(STUDENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model LegalDocument {
+  id          String   @id @default(uuid())
+  title       String
+  citation    String?
+  court       String?  // e.g., "Supreme Court", "High Court"
+  year        Int?
+  docType     String   @default("CASE") // CASE, STATUTE, CONSTITUTION, JOURNAL
+  content     String   @db.Text // The full text of the document
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
