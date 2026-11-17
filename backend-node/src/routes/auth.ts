@@ -1,12 +1,12 @@
+// backend-node/src/routes/auth.ts
 import { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { prisma } from '../db';
+import { prisma } from '../db'; // Now points correctly to src/db.ts
 
 export default async function authRoutes(fastify: FastifyInstance) {
   // 1. REGISTER ROUTE
   fastify.post('/register', async (request, reply) => {
-    // Validate request body using Zod
     const registerSchema = z.object({
       name: z.string().min(2),
       email: z.string().email(),
@@ -16,23 +16,21 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     const parsedBody = registerSchema.safeParse(request.body);
     if (!parsedBody.success) {
-      return reply.status(400).send({ error: parsedBody.error.errors });
+      // Changed .errors to .issues
+      return reply.status(400).send({ error: parsedBody.error.issues });
     }
 
     const { name, email, password, role } = parsedBody.data;
 
     try {
-      // Check if user already exists
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         return reply.status(400).send({ error: 'User with this email already exists.' });
       }
 
-      // Hash the password
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      // Create user in database
       const newUser = await prisma.user.create({
         data: {
           name,
@@ -42,13 +40,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
         },
       });
 
-      // Generate JWT Token
       const token = fastify.jwt.sign(
         { id: newUser.id, role: newUser.role },
         { expiresIn: '7d' }
       );
 
-      // Remove password from the response object
       const { password: _, ...userWithoutPassword } = newUser;
 
       return reply.status(201).send({
@@ -71,31 +67,28 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     const parsedBody = loginSchema.safeParse(request.body);
     if (!parsedBody.success) {
-      return reply.status(400).send({ error: parsedBody.error.errors });
+      // Changed .errors to .issues
+      return reply.status(400).send({ error: parsedBody.error.issues });
     }
 
     const { email, password } = parsedBody.data;
 
     try {
-      // Find the user
       const user = await prisma.user.findUnique({ where: { email } });
       if (!user) {
         return reply.status(401).send({ error: 'Invalid email or password.' });
       }
 
-      // Check password
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
         return reply.status(401).send({ error: 'Invalid email or password.' });
       }
 
-      // Generate JWT Token
       const token = fastify.jwt.sign(
         { id: user.id, role: user.role },
         { expiresIn: '7d' }
       );
 
-      // Remove password from the response
       const { password: _, ...userWithoutPassword } = user;
 
       return reply.send({
@@ -111,7 +104,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
   // 3. GET CURRENT USER (Protected Route)
   fastify.get('/me', { onRequest: [fastify.authenticate] }, async (request, reply) => {
-    // We will set up the authenticate hook in index.ts
     const userPayload = request.user as { id: string };
     
     const user = await prisma.user.findUnique({
