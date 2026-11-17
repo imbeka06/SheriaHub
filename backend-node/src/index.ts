@@ -1,3 +1,4 @@
+import libraryRoutes from './routes/library';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
@@ -41,6 +42,7 @@ fastify.get('/health', async (request, reply) => {
 
 // Register Routes
 fastify.register(authRoutes, { prefix: '/api/v1/auth' });
+fastify.register(libraryRoutes, { prefix: '/api/v1/library' }); 
 
 const start = async () => {
   try {
