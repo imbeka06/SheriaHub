@@ -1,5 +1,5 @@
 // backend-node/src/db.ts
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './generated/prisma/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -12,7 +12,6 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set in the root .env.local file");
 }
 
-// Instantiate the adapter
 const adapter = new PrismaPg({ connectionString });
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -20,7 +19,7 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient };
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
-    adapter, // Pass the adapter here
+    adapter,
     log: ['query', 'error', 'warn'],
   });
 
