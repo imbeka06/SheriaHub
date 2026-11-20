@@ -56,3 +56,26 @@ const start = async () => {
 };
 
 start();
+// Proxy AI chat requests from frontend to python worker
+fastify.post('/api/v1/ai/chat', { onRequest: [fastify.authenticate] }, async (request, reply) => {
+  try {
+    const { query } = request.body as { query: string };
+    
+    // Forward the request to the Python AI worker
+    const aiResponse = await fetch('http://localhost:8000/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+
+    if (!aiResponse.ok) {
+      throw new Error('AI worker failed to respond');
+    }
+
+    const data = await aiResponse.json();
+    return reply.send(data);
+  } catch (error) {
+    fastify.log.error(error);
+    return reply.status(500).send({ error: 'Failed to communicate with AI service' });
+  }
+});
