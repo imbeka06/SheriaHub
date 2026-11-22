@@ -3,26 +3,23 @@ from pydantic import BaseModel
 from groq import Groq
 import psycopg2
 import os
-import re
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
 
-# Load environment variables from the root .env.local
 load_dotenv(dotenv_path="../.env.local")
 
 app = FastAPI(title="SheriaHub AI Worker")
-
-# Initialize Groq Client
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Database connection
+print("Loading embedding model for API...")
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
 def get_db_connection():
     return psycopg2.connect(os.getenv("DATABASE_URL"))
 
-# Request Schema
 class ChatRequest(BaseModel):
     query: str
 
-# Response Schema
 class ChatResponse(BaseModel):
     answer: str
     sources: list
@@ -34,48 +31,45 @@ def health_check():
 @app.post("/api/chat", response_model=ChatResponse)
 def chat_with_ai(request: ChatRequest):
     try:
-        # 1. Extract keywords from the user's query (Ignoring common stop words)
-        stop_words = {"what", "did", "the", "say", "about", "in", "a", "is", "of", "to", "and", "for", "on", "with", "case"}
-        words = re.findall(r'\b\w+\b', request.query.lower())
-        keywords = [w for w in words if w not in stop_words and len(w) > 2]
+        query_embedding = model.encode(request.query).tolist()
 
-        if not keywords:
-            keywords = words # Fallback if all words were stop words
-
-        # 2. Connect to DB and retrieve context
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Build a dynamic SQL query using ILIKE for any of the keywords
-        conditions = " OR ".join([f"title ILIKE %s OR content ILIKE %s" for _ in keywords])
-        params = []
-        for kw in keywords:
-            params.extend([f"%{kw}%", f"%{kw}%"])
-
-        query = f"""
-            SELECT id, title, citation, content 
-            FROM "LegalDocument" 
-            WHERE {conditions}
+        # Fetch the top 3 most similar chunks
+        cur.execute("""
+            SELECT c.content, d.title, d.citation
+            FROM "DocumentChunk" c
+            JOIN "LegalDocument" d ON c."documentId" = d.id
+            ORDER BY c.embedding <=> %s::vector
             LIMIT 3;
-        """
+        """, (query_embedding,))
         
-        cur.execute(query, tuple(params))
         rows = cur.fetchall()
         cur.close()
         conn.close()
 
         if not rows:
-            return {"answer": "I could not find any legal documents related to your query in the library.", "sources": []}
+            return {"answer": "I could not find any legal documents related to your query.", "sources": []}
 
-        # 3. Format the context
+        # Format context for the LLM
         context = ""
         sources = []
+        seen_docs = set()
+        
         for row in rows:
-            doc_id, title, citation, content = row
-            context += f"Document: {title} ({citation})\nContent: {content[:2000]}...\n\n"
-            sources.append({"id": doc_id, "title": title})
+            content, title, citation = row
+            context += f"Document: {title} ({citation})\nContent: {content}\n\n"
+            
+            # Only add unique documents to the sources list
+            if title not in seen_docs:
+                sources.append({
+                    "title": title,
+                    "citation": citation,
+                    "snippet": content[:150] + "..." # Short preview of the text used
+                })
+                seen_docs.add(title)
 
-        # 4. Call Groq API
         prompt = f"""You are SheriaHub, a Kenyan legal AI assistant. 
 Answer the user's question based ONLY on the provided legal context. 
 If the answer is not in the context, say "I don't have that information in the current library."
@@ -94,9 +88,7 @@ Question: {request.query}
             max_tokens=1024,
         )
 
-        answer = completion.choices[0].message.content
-
-        return {"answer": answer, "sources": sources}
+        return {"answer": completion.choices[0].message.content, "sources": sources}
 
     except Exception as e:
         print(f"Error: {e}")
