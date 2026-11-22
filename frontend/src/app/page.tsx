@@ -28,9 +28,9 @@ export default function Home() {
   // Library State
   const [documents, setDocuments] = useState<any[]>([]);
 
-  // AI Chat State
+  // AI Chat State (Updated to accept sources)
   const [chatInput, setChatInput] = useState("");
-  const [chatHistory, setChatHistory] = useState<{role: string, content: string}[]>([]);
+  const [chatHistory, setChatHistory] = useState<{role: string, content: string, sources?: any[]}[]>([]);
   const [isTyping, setIsTyping] = useState(false);
 
   // Sync logged-in user's role with the dashboard view
@@ -104,7 +104,11 @@ export default function Home() {
       const data = await res.json();
       
       if (res.ok) {
-        setChatHistory(prev => [...prev, { role: "assistant", content: data.answer }]);
+        setChatHistory(prev => [...prev, { 
+          role: "assistant", 
+          content: data.answer, 
+          sources: data.sources // Capture the sources from the API
+        }]);
       } else {
         setChatHistory(prev => [...prev, { role: "assistant", content: "Sorry, I encountered an error." }]);
       }
@@ -624,7 +628,20 @@ export default function Home() {
                           color: msg.role === "user" ? "#fff" : "var(--ink)",
                           padding: "10px 14px", borderRadius: "10px", maxWidth: "85%", fontSize: "13px", lineHeight: "1.5"
                         }}>
-                          {msg.content}
+                          <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
+                          
+                          {/* Render sources if they exist */}
+                          {msg.sources && msg.sources.length > 0 && (
+                            <div style={{ marginTop: "12px", borderTop: "1px solid var(--silver)", paddingTop: "10px" }}>
+                              <p style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", color: "var(--slate)", margin: "0 0 6px 0" }}>Sources Cited</p>
+                              {msg.sources.map((src, idx) => (
+                                <div key={idx} style={{ background: "var(--white)", padding: "8px 10px", borderRadius: "6px", marginBottom: "6px", border: "1px solid var(--silver)" }}>
+                                  <strong style={{ fontSize: "11px", display: "block", color: "var(--ink)" }}>{src.title}</strong>
+                                  <span style={{ fontSize: "10px", color: "var(--slate)" }}>{src.citation}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))
                     )}
