@@ -1,4 +1,3 @@
-import libraryRoutes from './routes/library';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
@@ -6,6 +5,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { prisma } from './db';
 import authRoutes from './routes/auth';
+import libraryRoutes from './routes/library';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env.local') });
 
@@ -40,28 +40,21 @@ fastify.get('/health', async (request, reply) => {
   }
 });
 
-// Register Routes
+// ==========================================
+// REGISTER ALL ROUTES
+// ==========================================
+
+// Auth Routes
 fastify.register(authRoutes, { prefix: '/api/v1/auth' });
-fastify.register(libraryRoutes, { prefix: '/api/v1/library' }); 
 
-const start = async () => {
-  try {
-    const port = Number(process.env.PORT) || 3001;
-    await fastify.listen({ port, host: '0.0.0.0' });
-    console.log(` SheriaHub Backend running on http://localhost:${port}`);
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
-  }
-};
+// Library Routes
+fastify.register(libraryRoutes, { prefix: '/api/v1/library' });
 
-start();
-// Proxy AI chat requests from frontend to python worker
+// AI Proxy Route (Forwards to the Python AI Worker)
 fastify.post('/api/v1/ai/chat', { onRequest: [fastify.authenticate] }, async (request, reply) => {
   try {
     const { query } = request.body as { query: string };
     
-    // Forward the request to the Python AI worker
     const aiResponse = await fetch('http://localhost:8000/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -79,3 +72,19 @@ fastify.post('/api/v1/ai/chat', { onRequest: [fastify.authenticate] }, async (re
     return reply.status(500).send({ error: 'Failed to communicate with AI service' });
   }
 });
+
+// ==========================================
+// START SERVER (Must be last)
+// ==========================================
+const start = async () => {
+  try {
+    const port = Number(process.env.PORT) || 3001;
+    await fastify.listen({ port, host: '0.0.0.0' });
+    console.log(` SheriaHub Backend running on http://localhost:${port}`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
