@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
+  extensions = [vector] // Enables pgvector
 }
 
 enum Role {
@@ -34,4 +36,20 @@ model LegalDocument {
   content     String   @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Relation to chunks
+  chunks      DocumentChunk[]
+}
+
+model DocumentChunk {
+  id          String   @id @default(uuid())
+  documentId  String
+  content     String   @db.Text
+  // 1536 is the dimension size for standard embeddings (e.g., OpenAI text-embedding-3-small)
+  // Using Unsupported to allow raw pgvector operations in the future
+  embedding   Unsupported("vector(1536)")? 
+
+  document    LegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
 }
