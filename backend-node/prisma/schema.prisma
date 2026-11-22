@@ -46,8 +46,8 @@ model DocumentChunk {
   documentId  String
   content     String   @db.Text
   // 1536 is the dimension size for standard embeddings (e.g., OpenAI text-embedding-3-small)
-  // Using Unsupported to allow raw pgvector operations in the future
-  embedding   Unsupported("vector(1536)")? 
+  // chnaged to 384 to match free Hugging face model
+  embedding   Unsupported("vector(384)")? 
 
   document    LegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
