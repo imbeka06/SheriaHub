@@ -3,8 +3,8 @@ from pydantic import BaseModel
 from groq import Groq
 import psycopg2
 import os
+import re
 from dotenv import load_dotenv
-import json
 
 # Load environment variables from the root .env.local
 load_dotenv(dotenv_path="../.env.local")
@@ -34,19 +34,32 @@ def health_check():
 @app.post("/api/chat", response_model=ChatResponse)
 def chat_with_ai(request: ChatRequest):
     try:
-        # 1. Connect to DB and retrieve context
+        # 1. Extract keywords from the user's query (Ignoring common stop words)
+        stop_words = {"what", "did", "the", "say", "about", "in", "a", "is", "of", "to", "and", "for", "on", "with", "case"}
+        words = re.findall(r'\b\w+\b', request.query.lower())
+        keywords = [w for w in words if w not in stop_words and len(w) > 2]
+
+        if not keywords:
+            keywords = words # Fallback if all words were stop words
+
+        # 2. Connect to DB and retrieve context
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Simple keyword search for now (we will upgrade to pgvector later)
-        search_term = f"%{request.query}%"
-        cur.execute("""
+        # Build a dynamic SQL query using ILIKE for any of the keywords
+        conditions = " OR ".join([f"title ILIKE %s OR content ILIKE %s" for _ in keywords])
+        params = []
+        for kw in keywords:
+            params.extend([f"%{kw}%", f"%{kw}%"])
+
+        query = f"""
             SELECT id, title, citation, content 
             FROM "LegalDocument" 
-            WHERE title ILIKE %s OR content ILIKE %s
+            WHERE {conditions}
             LIMIT 3;
-        """, (search_term, search_term))
+        """
         
+        cur.execute(query, tuple(params))
         rows = cur.fetchall()
         cur.close()
         conn.close()
@@ -54,7 +67,7 @@ def chat_with_ai(request: ChatRequest):
         if not rows:
             return {"answer": "I could not find any legal documents related to your query in the library.", "sources": []}
 
-        # 2. Format the context
+        # 3. Format the context
         context = ""
         sources = []
         for row in rows:
@@ -62,7 +75,7 @@ def chat_with_ai(request: ChatRequest):
             context += f"Document: {title} ({citation})\nContent: {content[:2000]}...\n\n"
             sources.append({"id": doc_id, "title": title})
 
-        # 3. Call Groq API
+        # 4. Call Groq API
         prompt = f"""You are SheriaHub, a Kenyan legal AI assistant. 
 Answer the user's question based ONLY on the provided legal context. 
 If the answer is not in the context, say "I don't have that information in the current library."
@@ -75,7 +88,7 @@ Question: {request.query}
 """
 
         completion = groq_client.chat.completions.create(
-            model="openai/gpt-oss-20b", # The recommended replacement for Llama 3.1 8B
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=1024,
