@@ -44,6 +44,9 @@ export default function Home() {
   const [draftType, setDraftType] = useState("IRAC / ILAC problem answer");
   const [draftContent, setDraftContent] = useState("");
 
+  // Portfolio State
+  const [portfolioStats, setPortfolioStats] = useState<any>(null);
+
   // Sync logged-in user's role with the dashboard view
   useEffect(() => {
     if (user) {
@@ -99,6 +102,19 @@ export default function Home() {
       })
         .then(res => res.json())
         .then(data => setDrafts(data.drafts || []))
+        .catch(err => console.error(err));
+    }
+  }, [activePage]);
+
+  // Fetch Portfolio Stats Effect
+  useEffect(() => {
+    if (activePage === "portfolio") {
+      const token = localStorage.getItem("sheriahub_token");
+      fetch("http://localhost:3001/api/v1/portfolio/stats", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => setPortfolioStats(data.stats))
         .catch(err => console.error(err));
     }
   }, [activePage]);
@@ -866,15 +882,34 @@ export default function Home() {
             </section>
           )}
 
+          {/* DYNAMIC MY PORTFOLIO */}
           {activePage === "portfolio" && (
             <section className="page active">
               <div className="eyebrow">Supporting module · Academic portfolio</div>
               <h1 className="page-title">My Portfolio</h1>
               <p className="page-desc">Curate research projects, case briefs, writing samples, completed courses, assessment outcomes, advocacy sessions and milestones.</p>
-              <div className="feature-strip">
-                <div className="feature-mini"><strong>Research projects</strong><p>4 active · 2 completed · 1 published as a student note.</p></div>
-                <div className="feature-mini"><strong>Case briefs</strong><p>26 written · 8 reviewed by a peer circle.</p></div>
-              </div>
+              
+              {!portfolioStats ? (
+                <p style={{ color: "var(--slate)" }}>Loading your portfolio stats...</p>
+              ) : (
+                <div className="feature-strip">
+                  <div className="feature-mini">
+                    <strong>Research projects</strong>
+                    <p style={{ fontSize: "24px", color: "var(--accent)", margin: "8px 0" }}>{portfolioStats.projects}</p>
+                    <p>Active projects created in your workspace.</p>
+                  </div>
+                  <div className="feature-mini">
+                    <strong>Writing drafts</strong>
+                    <p style={{ fontSize: "24px", color: "var(--accent)", margin: "8px 0" }}>{portfolioStats.drafts}</p>
+                    <p>Saved legal drafts and case briefs.</p>
+                  </div>
+                  <div className="feature-mini">
+                    <strong>Advocacy sessions</strong>
+                    <p style={{ fontSize: "24px", color: "var(--accent)", margin: "8px 0" }}>{portfolioStats.advocacySessions}</p>
+                    <p>Completed virtual courtroom exercises.</p>
+                  </div>
+                </div>
+              )}
             </section>
           )}
 

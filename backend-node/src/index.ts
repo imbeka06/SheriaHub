@@ -8,6 +8,7 @@ import authRoutes from './routes/auth';
 import libraryRoutes from './routes/library';
 import projectRoutes from './routes/projects';
 import draftRoutes from './routes/drafts';
+import portfolioRoutes from './routes/portfolio';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env.local') });
 
@@ -55,6 +56,8 @@ fastify.register(libraryRoutes, { prefix: '/api/v1/library' });
 fastify.register(projectRoutes, { prefix: '/api/v1/projects' });
 // Drafts routes
 fastify.register(draftRoutes, { prefix: '/api/v1/drafts' });
+// Portfolio routes
+fastify.register(portfolioRoutes, { prefix: '/api/v1/portfolio' });
 
 // AI Proxy Route (Forwards to the Python AI Worker)
 fastify.post('/api/v1/ai/chat', { onRequest: [fastify.authenticate] }, async (request, reply) => {
