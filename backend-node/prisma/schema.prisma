@@ -33,11 +33,10 @@ model LegalDocument {
   court       String?
   year        Int?
   docType     String   @default("CASE")
-  content     String   @db.Text
+  // We are REMOVING the content String @db.Text line
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relation to chunks
   chunks      DocumentChunk[]
 }
 
