@@ -28,10 +28,21 @@ export default function Home() {
   // Library State
   const [documents, setDocuments] = useState<any[]>([]);
 
-  // AI Chat State (Updated to accept sources)
+  // AI Chat State
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<{role: string, content: string, sources?: any[]}[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+
+  // Research Projects State
+  const [projects, setProjects] = useState<any[]>([]);
+  const [newProjTitle, setNewProjTitle] = useState("");
+  const [newProjDesc, setNewProjDesc] = useState("");
+
+  // Writing Studio State
+  const [drafts, setDrafts] = useState<any[]>([]);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftType, setDraftType] = useState("IRAC / ILAC problem answer");
+  const [draftContent, setDraftContent] = useState("");
 
   // Sync logged-in user's role with the dashboard view
   useEffect(() => {
@@ -66,6 +77,32 @@ export default function Home() {
     }
   }, [activePage]);
 
+  // Fetch Projects Effect
+  useEffect(() => {
+    if (activePage === "projects") {
+      const token = localStorage.getItem("sheriahub_token");
+      fetch("http://localhost:3001/api/v1/projects", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => setProjects(data.projects || []))
+        .catch(err => console.error(err));
+    }
+  }, [activePage]);
+
+  // Fetch Drafts Effect
+  useEffect(() => {
+    if (activePage === "writing") {
+      const token = localStorage.getItem("sheriahub_token");
+      fetch("http://localhost:3001/api/v1/drafts", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => setDrafts(data.drafts || []))
+        .catch(err => console.error(err));
+    }
+  }, [activePage]);
+
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 2600);
@@ -80,6 +117,56 @@ export default function Home() {
   const switchRole = (role: "student" | "lecturer" | "researcher" | "admin") => {
     setActiveRole(role);
     setActivePage("overview");
+  };
+
+  const createProject = async () => {
+    if (!newProjTitle.trim()) return;
+    try {
+      const token = localStorage.getItem("sheriahub_token");
+      const res = await fetch("http://localhost:3001/api/v1/projects", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ title: newProjTitle, description: newProjDesc })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setProjects([data.project, ...projects]);
+        setNewProjTitle("");
+        setNewProjDesc("");
+        showToast("Project created successfully!");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error creating project.");
+    }
+  };
+
+  const saveDraft = async () => {
+    if (!draftTitle.trim() || !draftContent.trim()) return;
+    try {
+      const token = localStorage.getItem("sheriahub_token");
+      const res = await fetch("http://localhost:3001/api/v1/drafts", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ title: draftTitle, draftType, content: draftContent })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDrafts([data.draft, ...drafts]);
+        setDraftTitle("");
+        setDraftContent("");
+        showToast("Draft saved successfully!");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error saving draft.");
+    }
   };
 
   const sendMessage = async () => {
@@ -107,7 +194,7 @@ export default function Home() {
         setChatHistory(prev => [...prev, { 
           role: "assistant", 
           content: data.answer, 
-          sources: data.sources // Capture the sources from the API
+          sources: data.sources 
         }]);
       } else {
         setChatHistory(prev => [...prev, { role: "assistant", content: "Sorry, I encountered an error." }]);
@@ -630,7 +717,6 @@ export default function Home() {
                         }}>
                           <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
                           
-                          {/* Render sources if they exist */}
                           {msg.sources && msg.sources.length > 0 && (
                             <div style={{ marginTop: "12px", borderTop: "1px solid var(--silver)", paddingTop: "10px" }}>
                               <p style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", color: "var(--slate)", margin: "0 0 6px 0" }}>Sources Cited</p>
@@ -672,29 +758,73 @@ export default function Home() {
             </section>
           )}
 
+          {/* DYNAMIC RESEARCH PROJECTS */}
           {activePage === "projects" && (
             <section className="page active">
               <div className="eyebrow">Supporting module · Research notebook</div>
               <h1 className="page-title">Research Projects</h1>
               <p className="page-desc">Organise research questions, source collections, saved authorities, notes, argument maps and drafts by project.</p>
-              <div className="feature-strip">
-                <div className="feature-mini"><strong>Judicial review of administrative action</strong><p>Status: drafting · 24 sources · 6 notes · argument map started.</p></div>
-                <div className="feature-mini"><strong>Devolution &amp; county fiscal autonomy</strong><p>Status: researching · 41 sources · 3 open questions.</p></div>
+              
+              <div className="mock-area" style={{ marginBottom: "20px" }}>
+                <h3>Create a New Project</h3>
+                <input className="mock-input" placeholder="Project Title (e.g. Devolution & Fiscal Autonomy)" value={newProjTitle} onChange={e => setNewProjTitle(e.target.value)} />
+                <input className="mock-input" placeholder="Short Description (Optional)" value={newProjDesc} onChange={e => setNewProjDesc(e.target.value)} />
+                <button className="primary" onClick={createProject}>＋ Create Project</button>
+              </div>
+
+              <div className="feature-strip" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {projects.length === 0 ? (
+                  <p style={{ color: "var(--slate)" }}>No active projects yet. Create one above to get started.</p>
+                ) : (
+                  projects.map((proj: any) => (
+                    <div className="panel" key={proj.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <strong style={{ font: "16px Georgia,serif", display: "block" }}>{proj.title}</strong>
+                        <span style={{ fontSize: "12px", color: "var(--slate)" }}>{proj.description || "No description"}</span>
+                      </div>
+                      <span className="tag good">{proj.status}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           )}
 
+          {/* DYNAMIC WRITING STUDIO */}
           {activePage === "writing" && (
             <section className="page active">
               <div className="eyebrow">Supporting module · Writing &amp; drafting</div>
               <h1 className="page-title">Writing Studio</h1>
               <p className="page-desc">Structured drafting for IRAC/ILAC answers, case briefs, moot skeleton arguments, memoranda and verified pleadings.</p>
-              <div className="mock-area">
-                <h3>Start a new draft</h3>
-                <select className="mock-input"><option>IRAC / ILAC problem answer</option><option>Case brief</option></select>
-                <input className="mock-input" placeholder="Draft title or legal issue" />
-                <textarea className="mock-input" rows={5} placeholder="Begin with the issue…"></textarea>
-                <button className="primary" onClick={() => showToast("Draft saved locally.")}>Save draft</button>
+              
+              <div className="mock-area" style={{ marginBottom: "20px" }}>
+                <h3>Create a New Draft</h3>
+                <select className="mock-input" value={draftType} onChange={e => setDraftType(e.target.value)}>
+                  <option>IRAC / ILAC problem answer</option>
+                  <option>Case brief</option>
+                  <option>Moot skeleton argument</option>
+                  <option>Legal memorandum</option>
+                </select>
+                <input className="mock-input" placeholder="Draft title or legal issue" value={draftTitle} onChange={e => setDraftTitle(e.target.value)} />
+                <textarea className="mock-input" rows={5} placeholder="Begin with the issue…" value={draftContent} onChange={e => setDraftContent(e.target.value)}></textarea>
+                <button className="primary" onClick={saveDraft}>Save Draft</button>
+              </div>
+
+              <h3>Your Saved Drafts</h3>
+              <div className="feature-strip" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {drafts.length === 0 ? (
+                  <p style={{ color: "var(--slate)" }}>No saved drafts yet.</p>
+                ) : (
+                  drafts.map((draft: any) => (
+                    <div className="panel" key={draft.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <strong style={{ font: "16px Georgia,serif", display: "block" }}>{draft.title}</strong>
+                        <span style={{ fontSize: "12px", color: "var(--slate)" }}>{draft.draftType}</span>
+                      </div>
+                      <span className="tag">{new Date(draft.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           )}
