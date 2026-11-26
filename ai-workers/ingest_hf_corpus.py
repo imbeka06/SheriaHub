@@ -4,8 +4,8 @@ import uuid
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 from datasets import load_dataset
+import time
 
-# Load environment variables
 load_dotenv(dotenv_path="../.env.local")
 
 print("Loading embedding model...")
@@ -15,31 +15,38 @@ def get_db_connection():
     return psycopg2.connect(os.getenv("DATABASE_URL"))
 
 def ingest_corpus():
-    print("Loading dataset from Hugging Face...")
-    dataset = load_dataset("MakiniAI/kenya-law-corpus", split="train", streaming=True)
-    
     conn = get_db_connection()
     cur = conn.cursor()
 
+    print("Checking existing documents...")
+    cur.execute('SELECT title FROM "LegalDocument"')
+    existing_titles = set(row[0] for row in cur.fetchall())
+    print(f"Found {len(existing_titles)} documents already in the database.")
+
+    print("Loading dataset from Hugging Face...")
+    dataset = load_dataset("MakiniAI/kenya-law-corpus", split="train", streaming=True)
+    
     count = 0
-    MAX_CHUNKS = 50 
+    skipped = 0
     
     for row in dataset:
-        if count >= MAX_CHUNKS:
-            break
-            
         text = row['text']
         metadata = row['metadata'] 
         title = metadata.get('title', 'Unknown Kenyan Legal Document')
-        
+
+        # Skip if we already ingested this title
+        if title in existing_titles:
+            skipped += 1
+            continue
+
         doc_id = str(uuid.uuid4())
         
         try:
-            # 1. Insert into LegalDocument (FIXED: Added quotes around "docType")
+            # 1. Insert ONLY metadata into LegalDocument (No content!)
             cur.execute("""
-                INSERT INTO "LegalDocument" (id, title, citation, court, "docType", content, "createdAt", "updatedAt")
-                VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
-            """, (doc_id, title, "HF Corpus", "Various", "CASE", text))
+                INSERT INTO "LegalDocument" (id, title, citation, court, "docType", "createdAt", "updatedAt")
+                VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+            """, (doc_id, title, "HF Corpus", "Various", "CASE"))
             
             # 2. Generate embedding and insert into DocumentChunk
             embedding = model.encode(text).tolist()
@@ -50,15 +57,19 @@ def ingest_corpus():
             
             conn.commit()
             count += 1
-            print(f"[{count}/{MAX_CHUNKS}] Ingested: {title[:60]}...")
+            existing_titles.add(title) # Add to set so we don't process duplicates in the same run
             
+            if count % 100 == 0:
+                print(f"Successfully ingested {count} new chunks...")
+                time.sleep(1) 
+                
         except Exception as e:
             print(f"Error ingesting row: {e}")
             conn.rollback()
 
     cur.close()
     conn.close()
-    print(f"Ingestion complete! {count} chunks added to the database.")
+    print(f"Ingestion complete! Added {count} new chunks. Skipped {skipped} duplicates.")
 
 if __name__ == "__main__":
     ingest_corpus()
