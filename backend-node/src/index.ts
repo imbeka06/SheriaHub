@@ -6,6 +6,7 @@ import path from 'path';
 import { prisma } from './db';
 import authRoutes from './routes/auth';
 import libraryRoutes from './routes/library';
+import projectRoutes from './routes/projects';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env.local') });
 
@@ -49,6 +50,8 @@ fastify.register(authRoutes, { prefix: '/api/v1/auth' });
 
 // Library Routes
 fastify.register(libraryRoutes, { prefix: '/api/v1/library' });
+// Project routes
+fastify.register(projectRoutes, { prefix: '/api/v1/projects' });
 
 // AI Proxy Route (Forwards to the Python AI Worker)
 fastify.post('/api/v1/ai/chat', { onRequest: [fastify.authenticate] }, async (request, reply) => {
